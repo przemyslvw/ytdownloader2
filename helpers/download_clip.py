@@ -20,9 +20,11 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
     base_filename = "video"
     extension = ".mp4"
     counter = 1
-    video_filename = base_filename + extension
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    video_filename = os.path.join(output_dir, base_filename + extension)
     while os.path.exists(video_filename):
-        video_filename = f"{base_filename}_{counter:03d}{extension}"
+        video_filename = os.path.join(output_dir, f"{base_filename}_{counter:03d}{extension}")
         counter += 1
 
     try:
