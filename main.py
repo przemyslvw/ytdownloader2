@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
-from pytube import YouTube
+from yt_dlp import YoutubeDL
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy.editor import VideoFileClip
 
@@ -18,18 +18,17 @@ def download_and_extract():
     output_filename += f".{selected_format}"  # Dodaj rozszerzenie do nazwy pliku
 
     try:
-        # Pobieranie wideo
-        yt = YouTube(url)
-        stream = yt.streams.filter(file_extension="mp4", res="720p").first()
-        video_path = "video.mp4"
-        stream.download(filename=video_path)
+        # Pobieranie wideo przy użyciu yt-dlp
+        ydl_opts = {'format': 'best[ext=mp4]', 'outtmpl': 'video.mp4'}
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
         # Przycięcie lub wyodrębnienie dźwięku w zależności od wybranego formatu
         if selected_format == "mp4":
-            ffmpeg_extract_subclip(video_path, start_time, end_time, targetname=output_filename)
+            ffmpeg_extract_subclip("video.mp4", start_time, end_time, targetname=output_filename)
         elif selected_format == "mp3":
             # Przycinanie fragmentu i zapis jako mp3
-            with VideoFileClip(video_path) as video:
+            with VideoFileClip("video.mp4") as video:
                 audio = video.subclip(start_time, end_time).audio
                 audio.write_audiofile(output_filename)
         

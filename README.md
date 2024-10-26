@@ -1,5 +1,9 @@
 # YT downloader 2
 
+do uruchomienia potrzebujesz :
+
+pip install pytube moviepy
+
 Po uruchomieniu kodu otworzy się okno z polami tekstowymi do wprowadzenia:
 - Linku do filmu,
 - Czasu początkowego i końcowego w sekundach.
