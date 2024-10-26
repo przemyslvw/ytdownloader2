@@ -4,6 +4,30 @@ from yt_dlp import YoutubeDL
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy.editor import VideoFileClip
 
+# Funkcja sprawdzająca długość filmu
+def fetch_video_length():
+    url = url_entry.get()
+    if not url:
+        messagebox.showerror("Błąd", "Wklej link do filmu")
+        return
+
+    try:
+        # Pobieranie informacji o wideo przy użyciu yt-dlp
+        ydl_opts = {'format': 'best', 'quiet': True}
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            video_duration = int(info['duration'])
+
+        # Ustawienie maksymalnych wartości dla pól start i end
+        start_entry.delete(0, tk.END)
+        start_entry.insert(0, "0")
+        end_entry.delete(0, tk.END)
+        end_entry.insert(0, str(video_duration))
+
+        messagebox.showinfo("Długość filmu", f"Długość filmu: {video_duration} sekund")
+    except Exception as e:
+        messagebox.showerror("Błąd", f"Nie udało się pobrać informacji o filmie:\n{e}")
+
 # Funkcja do pobierania i wycinania fragmentu
 def download_and_extract():
     url = url_entry.get()
@@ -39,12 +63,16 @@ def download_and_extract():
 # Konfiguracja okna GUI
 root = tk.Tk()
 root.title("Pobieranie fragmentu YouTube")
-root.geometry("400x300")
+root.geometry("400x350")
 
 # Elementy interfejsu
 tk.Label(root, text="Link do filmu:").pack()
 url_entry = tk.Entry(root, width=50)
 url_entry.pack()
+
+# Przycisk do pobrania długości filmu
+check_button = tk.Button(root, text="Sprawdź długość filmu", command=fetch_video_length)
+check_button.pack()
 
 tk.Label(root, text="Czas początkowy (sekundy):").pack()
 start_entry = tk.Entry(root, width=10)
