@@ -2,7 +2,7 @@
 
 do uruchomienia potrzebujesz :
 
-pip install pytube moviepy
+pip install yt_dlp moviepy
 
 Po uruchomieniu kodu otworzy się okno z polami tekstowymi do wprowadzenia:
 - Linku do filmu,
