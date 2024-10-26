@@ -8,7 +8,13 @@ def download_and_extract():
     url = url_entry.get()
     start_time = int(start_entry.get())
     end_time = int(end_entry.get())
-    output_path = "clip.mp4"
+    output_filename = output_entry.get()
+
+    # Ustaw domyślną nazwę, jeśli pole jest puste
+    if not output_filename:
+        output_filename = "clip.mp4"
+    else:
+        output_filename += ".mp4"
 
     try:
         # Pobieranie wideo
@@ -18,15 +24,15 @@ def download_and_extract():
         stream.download(filename=video_path)
 
         # Przycięcie fragmentu
-        ffmpeg_extract_subclip(video_path, start_time, end_time, targetname=output_path)
-        messagebox.showinfo("Sukces", f"Wycinek zapisano jako {output_path}")
+        ffmpeg_extract_subclip(video_path, start_time, end_time, targetname=output_filename)
+        messagebox.showinfo("Sukces", f"Wycinek zapisano jako {output_filename}")
     except Exception as e:
         messagebox.showerror("Błąd", str(e))
 
 # Konfiguracja okna GUI
 root = tk.Tk()
 root.title("Pobieranie fragmentu YouTube")
-root.geometry("400x200")
+root.geometry("400x250")
 
 # Elementy interfejsu
 tk.Label(root, text="Link do filmu:").pack()
@@ -40,6 +46,10 @@ start_entry.pack()
 tk.Label(root, text="Czas końcowy (sekundy):").pack()
 end_entry = tk.Entry(root, width=10)
 end_entry.pack()
+
+tk.Label(root, text="Nazwa zapisanego pliku:").pack()
+output_entry = tk.Entry(root, width=20)
+output_entry.pack()
 
 download_button = tk.Button(root, text="Pobierz i wytnij fragment", command=download_and_extract)
 download_button.pack()
