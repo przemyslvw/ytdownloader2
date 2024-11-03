@@ -16,20 +16,23 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
         output_filename = "clip"
     output_filename += f".{selected_format}"  # Dodaj rozszerzenie do nazwy pliku
 
-    # Find a unique filename for the downloaded video
-    base_filename = "video"
-    extension = ".mp4"
-    counter = 1
-    output_dir = "output"
-    os.makedirs(output_dir, exist_ok=True)
-    video_filename = os.path.join(output_dir, base_filename + extension)
-    while os.path.exists(video_filename):
-        video_filename = os.path.join(output_dir, f"{base_filename}_{counter:03d}{extension}")
-        counter += 1
-
     try:
+        # Pobieranie metadanych wideo przy użyciu yt-dlp
+        ydl_opts = {'format': 'best[ext=mp4]', 'outtmpl': '%(title)s.%(ext)s'}
+        with YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=False)
+            video_title = info_dict.get('title', 'video').replace(' ', '_')
+            extension = 'mp4'
+            video_filename = os.path.join("output", f"{video_title}.{extension}")
+
+        # Find a unique filename for the downloaded video
+        counter = 1
+        while os.path.exists(video_filename):
+            video_filename = os.path.join("output", f"{video_title}_{counter:03d}.{extension}")
+            counter += 1
+
         # Pobieranie wideo przy użyciu yt-dlp
-        ydl_opts = {'format': 'best[ext=mp4]', 'outtmpl': video_filename}
+        ydl_opts['outtmpl'] = video_filename
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
