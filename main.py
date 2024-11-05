@@ -3,6 +3,11 @@ from tkinter import ttk
 from ttkthemes import ThemedTk
 from helpers.video_info import fetch_video_length
 from helpers.download_clip import download_and_extract
+import re
+
+def sanitize_filename(filename):
+    # Usuwa znaki specjalne, w tym emoji
+    return re.sub(r'[^\w\s.-]', '', filename)
 
 # Konfiguracja nowoczesnego okna GUI z ThemedTk
 root = ThemedTk(theme="arc")
@@ -60,6 +65,11 @@ ttk.Radiobutton(format_frame, text="MP4", variable=format_var, value="mp4").grid
 ttk.Radiobutton(format_frame, text="MP3", variable=format_var, value="mp3").grid(row=0, column=1, padx=10)
 
 def download_and_extract_with_loading(url_entry, start_entry, end_entry, output_entry, format_var):
+    # Sanitacja nazwy pliku
+    output_filename = sanitize_filename(output_entry.get())
+    output_entry.delete(0, tk.END)
+    output_entry.insert(0, output_filename)
+
     loading_label = show_loading_animation()
     download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var)
     hide_loading_animation(loading_label)
