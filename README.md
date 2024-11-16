@@ -18,7 +18,9 @@ Instalacja FFmpeg
 ## Windows:
 Pobierz z:
 https://ffmpeg.org/download.html
-wypakuj do C:\ffmpeg, dodaj C:\ffmpeg\bin do Path, sprawdź:
+wypakuj do C:\ffmpeg, 
+dodaj C:\ffmpeg\bin do Path, 
+sprawdź:
 bash
 ffmpeg -version
 
