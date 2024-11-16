@@ -68,6 +68,10 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
                 audio = video.subclip(start_time, end_time).audio
                 audio.write_audiofile(output_filename)
 
+        # Usuń oryginalny plik po pomyślnym przetworzeniu
+        if os.path.exists(video_filename):
+            os.remove(video_filename)
+
         messagebox.showinfo("Sukces", f"Wycinek zapisano jako {output_filename}")
 
     except ValueError:
