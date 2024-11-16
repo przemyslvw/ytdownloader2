@@ -32,9 +32,28 @@ def hide_loading_animation(loading_label):
     loading_label.destroy()
 
 def fetch_video_length_with_loading(url_entry, start_entry, end_entry, output_entry):
+    # Sanitacja nazwy pliku
+    sanitized_filename = sanitize_filename(output_entry.get())
+    output_entry.delete(0, tk.END)
+    output_entry.insert(0, sanitized_filename)
+
+    # Animacja ładowania
     loading_label = show_loading_animation()
     fetch_video_length(url_entry, start_entry, end_entry, output_entry)
     hide_loading_animation(loading_label)
+
+def download_and_extract_with_loading(url_entry, start_entry, end_entry, output_entry, format_var):
+    # Sanitacja nazwy pliku
+    sanitized_filename = sanitize_filename(output_entry.get())
+
+    # Przekazanie oczyszczonej nazwy pliku do funkcji
+    sanitized_output_entry = tk.StringVar()
+    sanitized_output_entry.set(sanitized_filename)
+
+    loading_label = show_loading_animation()
+    download_and_extract(url_entry, start_entry, end_entry, sanitized_output_entry, format_var)
+    hide_loading_animation(loading_label)
+
 
 # Elementy interfejsu
 ttk.Label(root, text="Link do filmu:").pack(pady=5)
@@ -63,16 +82,6 @@ format_frame = ttk.Frame(root)
 format_frame.pack()
 ttk.Radiobutton(format_frame, text="MP4", variable=format_var, value="mp4").grid(row=0, column=0, padx=10)
 ttk.Radiobutton(format_frame, text="MP3", variable=format_var, value="mp3").grid(row=0, column=1, padx=10)
-
-def download_and_extract_with_loading(url_entry, start_entry, end_entry, output_entry, format_var):
-    # Sanitacja nazwy pliku
-    output_filename = sanitize_filename(output_entry.get())
-    output_entry.delete(0, tk.END)
-    output_entry.insert(0, output_filename)
-
-    loading_label = show_loading_animation()
-    download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var)
-    hide_loading_animation(loading_label)
 
 download_button = ttk.Button(root, text="Pobierz i wytnij fragment", command=lambda: download_and_extract_with_loading(url_entry, start_entry, end_entry, output_entry, format_var))
 download_button.pack(pady=20)

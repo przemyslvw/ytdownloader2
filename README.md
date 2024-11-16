@@ -2,10 +2,34 @@
 
 do uruchomienia potrzebujesz :
 
-pip install yt_dlp moviepy
+pip install -r requirements.txt
 
-Po uruchomieniu kodu otworzy się okno z polami tekstowymi do wprowadzenia:
-- Linku do filmu,
-- Czasu początkowego i końcowego w sekundach.
-- Kliknij przycisk "Pobierz i wytnij fragment", aby rozpocząć proces.
-- Wycinek zostanie zapisany jako clip.mp4 w folderze, w którym uruchomiono skrypt.
+Instalacja FFmpeg
+# YT Downloader 2
+
+## Instalacja
+
+1. Zainstaluj wymagane biblioteki:
+   ```bash
+   pip install -r requirements.txt
+
+2. Zainstaluj FFmpeg:
+
+## Windows:
+Pobierz z Gyan.dev, wypakuj do C:\ffmpeg, dodaj C:\ffmpeg\bin do Path, sprawdź:
+bash
+ffmpeg -version
+
+## Linux/macOS:
+
+bash
+
+sudo apt install ffmpeg        # Linux
+brew install ffmpeg            # macOS
+Uruchomienie
+Wpisz w terminalu:
+bash
+
+python main.py
+Wprowadź dane w GUI i kliknij Pobierz i wytnij fragment.
+Plik zostanie zapisany w folderze output.
