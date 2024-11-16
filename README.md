@@ -16,7 +16,9 @@ Instalacja FFmpeg
 2. Zainstaluj FFmpeg:
 
 ## Windows:
-Pobierz z Gyan.dev, wypakuj do C:\ffmpeg, dodaj C:\ffmpeg\bin do Path, sprawdź:
+Pobierz z:
+https://ffmpeg.org/download.html
+wypakuj do C:\ffmpeg, dodaj C:\ffmpeg\bin do Path, sprawdź:
 bash
 ffmpeg -version
 
