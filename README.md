@@ -37,3 +37,6 @@ bash
 python main.py
 Wprowadź dane w GUI i kliknij Pobierz i wytnij fragment.
 Plik zostanie zapisany w folderze output.
+
+3. Czasem jest potrzebna aktualizacja yt-dlp
+pip install -U yt-dlp
