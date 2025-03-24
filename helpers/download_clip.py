@@ -1,6 +1,7 @@
 import os
 import re
-from yt_dlp import YoutubeDL
+import subprocess
+import json
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy.editor import VideoFileClip
 from tkinter import messagebox
@@ -13,70 +14,79 @@ def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\u0000-\u001F]', '', filename)
 
 
+def get_video_info(url):
+    """
+    Pobiera metadane filmu za pomocą yt-dlp.exe i zwraca jako dict.
+    """
+    try:
+        result = subprocess.run(
+            ["yt-dlp.exe", "-j", url],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=True
+        )
+        return json.loads(result.stdout)
+    except subprocess.CalledProcessError as e:
+        messagebox.showerror("Błąd", f"Błąd przy pobieraniu metadanych:\n{e.output}")
+        raise
+
+
 def download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var):
     try:
-        # Pobierz dane z pól tekstowych
         url = url_entry.get()
         start_time = int(start_entry.get())
         end_time = int(end_entry.get())
         output_filename = sanitize_filename(output_entry.get())
         selected_format = format_var.get()
 
-        # Walidacja czasu
         if start_time < 0 or end_time <= start_time:
             messagebox.showerror("Błąd", "Nieprawidłowy czas początkowy lub końcowy.")
             return
 
-        # Ustaw domyślną nazwę pliku, jeśli pole jest puste
         if not output_filename:
             output_filename = "clip"
-        output_filename += f".{selected_format}"
 
-        # Utwórz folder output, jeśli nie istnieje
         output_dir = "output"
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        # Ustawienia yt-dlp, wymuszenie formatu MP4
-        ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
-            'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s')
-        }
+        # Pobierz info o filmie
+        info_dict = get_video_info(url)
 
-        # Pobierz metadane wideo
-        with YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=False)
-            video_title = sanitize_filename(info_dict.get('title', 'video').replace(' ', '_'))
-            video_filename = os.path.join(output_dir, f"{video_title}.mp4")
+        print("=== FORMATY DOSTĘPNE DLA TEGO FILMU ===")
+        for f in info_dict.get('formats', []):
+            print(f"{f['format_id']} - {f.get('ext')} - {f.get('format_note')} - {f.get('resolution')} - {f.get('fps')}")
 
-        # Znajdź unikalną nazwę pliku
-        counter = 1
-        while os.path.exists(video_filename):
-            video_filename = os.path.join(output_dir, f"{video_title}_{counter:03d}.mp4")
-            counter += 1
+        video_title = sanitize_filename(info_dict.get('title', 'video').replace(' ', '_'))
+        temp_video_path = os.path.join(output_dir, f"{video_title}.mp4")
+        final_output_path = os.path.join(output_dir, f"{output_filename}.{selected_format}")
 
-        # Pobieranie wideo
-        ydl_opts['outtmpl'] = video_filename
-        with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        # Pobierz film przy pomocy yt-dlp.exe
+        subprocess.run(
+            ["yt-dlp.exe", "-f", "best", "-o", temp_video_path, url],
+            check=True
+        )
 
-        # Przycięcie lub wyodrębnienie dźwięku
+        # Wytnij fragment
         if selected_format == "mp4":
-            ffmpeg_extract_subclip(video_filename, start_time, end_time, targetname=output_filename)
+            ffmpeg_extract_subclip(temp_video_path, start_time, end_time, targetname=final_output_path)
         elif selected_format == "mp3":
-            with VideoFileClip(video_filename) as video:
+            with VideoFileClip(temp_video_path) as video:
                 audio = video.subclip(start_time, end_time).audio
-                audio.write_audiofile(output_filename)
+                audio.write_audiofile(final_output_path)
 
-        # Usuń oryginalny plik po pomyślnym przetworzeniu
-        if os.path.exists(video_filename):
-            os.remove(video_filename)
+        # Usuń plik tymczasowy
+        if os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
 
-        messagebox.showinfo("Sukces", f"Wycinek zapisano jako {output_filename}")
+        messagebox.showinfo("Sukces", f"Wycinek zapisano jako {final_output_path}")
 
     except ValueError:
         messagebox.showerror("Błąd", "Czas początkowy i końcowy muszą być liczbami.")
     except FileNotFoundError as e:
         messagebox.showerror("Błąd", f"Nie znaleziono pliku: {str(e)}")
+    except subprocess.CalledProcessError as e:
+        messagebox.showerror("Błąd", f"Błąd yt-dlp:\n{e.output}")
     except Exception as e:
         messagebox.showerror("Błąd", f"Wystąpił błąd: {str(e)}")
