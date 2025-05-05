@@ -16,11 +16,12 @@ def sanitize_filename(filename):
 
 def get_video_info(url):
     """
-    Pobiera metadane filmu za pomocą yt-dlp.exe i zwraca jako dict.
+    Pobiera metadane filmu za pomocą yt-dlp i zwraca jako dict.
     """
     try:
+        # Użyj 'yt-dlp' zamiast 'yt-dlp.exe'
         result = subprocess.run(
-            ["yt-dlp.exe", "-j", url],
+            ["yt-dlp", "-j", url],  # Poprawiona nazwa programu
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -62,9 +63,9 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
         temp_video_path = os.path.join(output_dir, f"{video_title}.mp4")
         final_output_path = os.path.join(output_dir, f"{output_filename}.{selected_format}")
 
-        # Pobierz film przy pomocy yt-dlp.exe
+        # Pobierz film przy pomocy yt-dlp
         subprocess.run(
-            ["yt-dlp.exe", "-f", "best", "-o", temp_video_path, url],
+            ["yt-dlp", "-f", "best", "-o", temp_video_path, url],  # Zmieniono 'yt-dlp.exe' na 'yt-dlp'
             check=True
         )
 

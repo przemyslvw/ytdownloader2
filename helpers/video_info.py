@@ -14,11 +14,12 @@ def sanitize_filename(filename):
 
 def get_video_info(url):
     """
-    Pobiera metadane filmu za pomocą yt-dlp.exe jako JSON.
+    Pobiera metadane filmu za pomocą yt-dlp i zwraca jako dict.
     """
     try:
+        # Użyj 'yt-dlp' zamiast 'yt-dlp.exe'
         result = subprocess.run(
-            ["yt-dlp.exe", "-j", url],
+            ["yt-dlp", "-j", url],  # Poprawiona nazwa programu
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -26,7 +27,7 @@ def get_video_info(url):
         )
         return json.loads(result.stdout)
     except subprocess.CalledProcessError as e:
-        messagebox.showerror("Błąd", f"Błąd podczas pobierania metadanych:\n{e.output}")
+        messagebox.showerror("Błąd", f"Błąd przy pobieraniu metadanych:\n{e.output}")
         raise
 
 
