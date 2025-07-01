@@ -1,4 +1,4 @@
-yt-dlp>=2023.11.16
+yt-dlp==2025.6.30
 moviepy==1.0.3
 ttkthemes>=3.2.2
 imageio>=2.5.0
