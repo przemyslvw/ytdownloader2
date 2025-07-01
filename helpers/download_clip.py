@@ -50,7 +50,8 @@ def get_video_info(url):
         raise Exception(f"Błąd podczas wykonywania yt-dlp: {error_msg}")
 
 def download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var):
-    temp_video_path = None
+    temp_dir = None
+    process = None
     try:
         url = url_entry.get().strip()
         if not url:
@@ -88,91 +89,133 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
         selected_format = format_var.get()
         final_output_path = os.path.join(output_dir, f"{output_filename}.{selected_format}")
         
-        # Unikalna nazwa pliku tymczasowego
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
-            temp_video_path = temp_file.name
+        # Utwórz katalog tymczasowy
+        temp_dir = tempfile.mkdtemp()
+        temp_video_path = os.path.join(temp_dir, "temp_video.%(ext)s")
 
-        # Pobierz film z użyciem yt-dlp z dodatkowymi opcjami
-        yt_dlp_command = [
-            "yt-dlp",
-            "--no-warnings",
-            "--ignore-errors",
-            "--no-check-certificate",
-            "--geo-bypass",
-            "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-            "--merge-output-format", "mp4",
-            "--output", temp_video_path,
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "--referer", "https://www.youtube.com/",
-            url
-        ]
-        
         try:
-            # Run yt-dlp
+            # Pobierz film z użyciem yt-dlp
             logger.info("Pobieranie filmu z YouTube...")
-            result = subprocess.run(yt_dlp_command, check=True, capture_output=True, text=True)
+            yt_dlp_command = [
+                "yt-dlp",
+                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "--output", temp_video_path,
+                "--newline",
+                "--no-part",
+                "--no-check-certificate",
+                "--geo-bypass",
+                "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "--referer", "https://www.youtube.com/",
+                "--merge-output-format", "mp4",
+                "--force-overwrites",
+                "--no-mtime",
+                url
+            ]
+            
+            # Uruchom proces z wyjściem w czasie rzeczywistym
+            process = subprocess.Popen(
+                yt_dlp_command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1,
+                text=True
+            )
+            
+            # Wyświetl postęp w konsoli
+            for line in process.stdout:
+                logger.info(line.strip())
+                
+            # Poczekaj na zakończenie procesu
+            process.wait()
+            
+            # Sprawdź kod wyjścia
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, yt_dlp_command)
+            
+            # Znajdź rzeczywistą nazwę pliku (yt-dlp może dodać rozszerzenie)
+            actual_video_path = temp_video_path % {'ext': 'mp4'}
+            if not os.path.exists(actual_video_path):
+                # Spróbuj znaleźć plik z innym rozszerzeniem
+                for f in os.listdir(temp_dir):
+                    if f.startswith("temp_video."):
+                        actual_video_path = os.path.join(temp_dir, f)
+                        break
+            
+            if not os.path.exists(actual_video_path) or os.path.getsize(actual_video_path) == 0:
+                raise Exception("Pobrany plik wideo jest pusty lub nie istnieje")
+                
             logger.info("Pobieranie zakończone pomyślnie")
 
             # Wytnij fragment
-            try:
-                logger.info(f"Przetwarzanie wideo: wycinanie fragmentu od {start_time}s do {end_time}s")
-                if selected_format == "mp4":
-                    ffmpeg_extract_subclip(
-                        temp_video_path, 
-                        start_time, 
-                        end_time, 
-                        targetname=final_output_path
-                    )
-                elif selected_format == "mp3":
-                    video = VideoFileClip(temp_video_path)
-                    audio = video.subclip(start_time, end_time).audio
-                    audio.write_audiofile(
-                        final_output_path,
-                        codec='libmp3lame',
-                        bitrate='192k',
-                        logger=None
-                    )
-                    video.close()
+            logger.info(f"Przetwarzanie wideo: wycinanie fragmentu od {start_time}s do {end_time}s")
+            
+            if selected_format == "mp4":
+                cmd = [
+                    'ffmpeg',
+                    '-y',
+                    '-ss', str(start_time),
+                    '-i', actual_video_path,
+                    '-to', str(end_time - start_time),
+                    '-c:v', 'libx264',
+                    '-c:a', 'aac',
+                    '-strict', 'experimental',
+                    '-b:a', '192k',
+                    '-movflags', '+faststart',
+                    final_output_path
+                ]
+                subprocess.run(cmd, check=True, capture_output=True, text=True)
+                
+            elif selected_format == "mp3":
+                video = VideoFileClip(actual_video_path)
+                audio = video.subclip(start_time, end_time).audio
+                audio.write_audiofile(
+                    final_output_path,
+                    codec='libmp3lame',
+                    bitrate='192k',
+                    logger=None
+                )
+                video.close()
+                audio.close()
 
-                logger.info(f"Plik został zapisany jako: {final_output_path}")
-                messagebox.showinfo("Sukces", f"Wycinek został zapisany jako:\n{final_output_path}")
-                
-            except Exception as e:
-                error_msg = str(e)
-                logger.error(f"Błąd podczas przetwarzania wideo: {error_msg}")
-                if "ffmpeg" in error_msg.lower():
-                    error_msg += "\n\nUpewnij się, że ffmpeg jest poprawnie zainstalowany i dostępny w ścieżce systemowej."
-                messagebox.showerror("Błąd przetwarzania wideo", error_msg)
-                
+            logger.info(f"Plik został zapisany jako: {final_output_path}")
+            messagebox.showinfo("Sukces", f"Wycinek został zapisany jako:\n{final_output_path}")
+            
         except subprocess.CalledProcessError as e:
-            error_msg = e.stderr if e.stderr else str(e)
-            logger.error(f"Błąd yt-dlp: {error_msg}")
-            messagebox.showerror("Błąd", f"Błąd podczas pobierania filmu: {error_msg}")
+            error_msg = f"Błąd podczas pobierania filmu (kod {e.returncode})"
+            logger.error(error_msg)
+            messagebox.showerror("Błąd", error_msg)
             
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Nieoczekiwany błąd: {error_msg}")
             messagebox.showerror("Błąd", f"Wystąpił nieoczekiwany błąd: {error_msg}")
             
-        finally:
-            # Sprzątanie plików tymczasowych
-            try:
-                if temp_video_path and os.path.exists(temp_video_path):
-                    os.remove(temp_video_path)
-                    logger.info("Usunięto plik tymczasowy")
-            except Exception as e:
-                logger.warning(f"Nie udało się usunąć pliku tymczasowego: {e}")
-
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Krytyczny błąd: {error_msg}")
         messagebox.showerror("Błąd krytyczny", f"Wystąpił krytyczny błąd: {error_msg}")
         
     finally:
-        # Upewnij się, że plik tymczasowy zostanie usunięty nawet w przypadku błędu
-        if 'temp_video_path' in locals() and temp_video_path and os.path.exists(temp_video_path):
+        # Zatrzymaj proces, jeśli jeszcze działa
+        if process and process.poll() is None:
+            process.terminate()
             try:
-                os.remove(temp_video_path)
-                logger.info("Usunięto plik tymczasowy w bloku finally")
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        
+        # Sprzątanie plików tymczasowych
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                for file in os.listdir(temp_dir):
+                    try:
+                        file_path = os.path.join(temp_dir, file)
+                        if os.path.isfile(file_path):
+                            os.unlink(file_path)
+                    except Exception as e:
+                        logger.warning(f"Nie udało się usunąć pliku {file}: {e}")
+                os.rmdir(temp_dir)
+                logger.info("Usunięto pliki tymczasowe")
             except Exception as e:
-                logger.warning(f"Nie udało się usunąć pliku tymczasowego w bloku finally: {e}")
+                logger.warning(f"Nie udało się usunąć plików tymczasowych: {e}")
