@@ -1,3 +1,7 @@
-yt-dlp
-moviepy
-ttkthemes
+yt-dlp>=2023.11.16
+moviepy==1.0.3
+ttkthemes>=3.2.2
+imageio>=2.5.0
+imageio-ffmpeg>=0.2.0
+numpy>=1.17.3
+Pillow>=8.3.2
