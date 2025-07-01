@@ -3,17 +3,20 @@ import re
 import subprocess
 import json
 import tempfile
+import logging
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-from moviepy.editor import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from tkinter import messagebox
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def sanitize_filename(filename):
     """
     Usuwa niedozwolone znaki z nazwy pliku.
     """
     return re.sub(r'[<>:"/\\|?*\u0000-\u001F]', '', filename)
-
 
 def get_video_info(url):
     """
@@ -29,35 +32,25 @@ def get_video_info(url):
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "--referer", "https://www.youtube.com/",
             "--dump-json",
-            "--no-download",
             url
         ]
         
-        result = subprocess.run(
-            yt_dlp_command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True
-        )
+        result = subprocess.run(yt_dlp_command, capture_output=True, text=True, check=True)
         
-        if not result.stdout.strip():
-            error_msg = result.stderr if result.stderr else "Pusta odpowiedź z serwera YouTube"
-            raise Exception(f"Błąd: {error_msg}")
-            
         try:
             return json.loads(result.stdout)
         except json.JSONDecodeError as e:
-            print("Odpowiedź serwera (debug):")
-            print(result.stdout[:500])  # Wyświetl pierwsze 500 znaków odpowiedzi
+            logger.error("Odpowiedź serwera (debug):")
+            logger.error(result.stdout[:500])  # Wyświetl pierwsze 500 znaków odpowiedzi
             raise Exception(f"Nieprawidłowa odpowiedź z serwera YouTube: {str(e)}")
             
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr if e.stderr else "Nieznany błąd podczas pobierania informacji o filmie"
+        logger.error(f"Błąd yt-dlp: {error_msg}")
         raise Exception(f"Błąd podczas wykonywania yt-dlp: {error_msg}")
 
-
 def download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var):
+    temp_video_path = None
     try:
         url = url_entry.get().strip()
         if not url:
@@ -69,6 +62,7 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
             video_info = get_video_info(url)
             video_title = video_info.get('title', 'film')
             video_title = sanitize_filename(video_title)
+            logger.info(f"Pobieranie filmu: {video_title}")
         except Exception as e:
             messagebox.showerror("Błąd", f"Nie udało się pobrać informacji o filmie: {str(e)}")
             return
@@ -114,37 +108,71 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
         ]
         
         try:
-            subprocess.run(yt_dlp_command, check=True)
+            # Run yt-dlp
+            logger.info("Pobieranie filmu z YouTube...")
+            result = subprocess.run(yt_dlp_command, check=True, capture_output=True, text=True)
+            logger.info("Pobieranie zakończone pomyślnie")
 
             # Wytnij fragment
-            if selected_format == "mp4":
-                ffmpeg_extract_subclip(temp_video_path, start_time, end_time, targetname=final_output_path)
-            elif selected_format == "mp3":
-                with VideoFileClip(temp_video_path) as video:
+            try:
+                logger.info(f"Przetwarzanie wideo: wycinanie fragmentu od {start_time}s do {end_time}s")
+                if selected_format == "mp4":
+                    ffmpeg_extract_subclip(
+                        temp_video_path, 
+                        start_time, 
+                        end_time, 
+                        targetname=final_output_path
+                    )
+                elif selected_format == "mp3":
+                    video = VideoFileClip(temp_video_path)
                     audio = video.subclip(start_time, end_time).audio
-                    audio.write_audiofile(final_output_path, logger=None)
+                    audio.write_audiofile(
+                        final_output_path,
+                        codec='libmp3lame',
+                        bitrate='192k',
+                        logger=None
+                    )
+                    video.close()
 
-            messagebox.showinfo("Sukces", f"Wycinek został zapisany jako:\n{final_output_path}")
-            
+                logger.info(f"Plik został zapisany jako: {final_output_path}")
+                messagebox.showinfo("Sukces", f"Wycinek został zapisany jako:\n{final_output_path}")
+                
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"Błąd podczas przetwarzania wideo: {error_msg}")
+                if "ffmpeg" in error_msg.lower():
+                    error_msg += "\n\nUpewnij się, że ffmpeg jest poprawnie zainstalowany i dostępny w ścieżce systemowej."
+                messagebox.showerror("Błąd przetwarzania wideo", error_msg)
+                
         except subprocess.CalledProcessError as e:
-            messagebox.showerror("Błąd", f"Błąd podczas pobierania filmu. Kod błędu: {e.returncode}")
+            error_msg = e.stderr if e.stderr else str(e)
+            logger.error(f"Błąd yt-dlp: {error_msg}")
+            messagebox.showerror("Błąd", f"Błąd podczas pobierania filmu: {error_msg}")
+            
         except Exception as e:
-            messagebox.showerror("Błąd", f"Wystąpił nieoczekiwany błąd: {str(e)}")
+            error_msg = str(e)
+            logger.error(f"Nieoczekiwany błąd: {error_msg}")
+            messagebox.showerror("Błąd", f"Wystąpił nieoczekiwany błąd: {error_msg}")
+            
         finally:
             # Sprzątanie plików tymczasowych
             try:
-                if os.path.exists(temp_video_path):
+                if temp_video_path and os.path.exists(temp_video_path):
                     os.remove(temp_video_path)
+                    logger.info("Usunięto plik tymczasowy")
             except Exception as e:
-                print(f"Ostrzeżenie: Nie udało się usunąć pliku tymczasowego: {e}")
+                logger.warning(f"Nie udało się usunąć pliku tymczasowego: {e}")
 
     except Exception as e:
-        messagebox.showerror("Błąd", f"Nieoczekiwany błąd: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Krytyczny błąd: {error_msg}")
+        messagebox.showerror("Błąd krytyczny", f"Wystąpił krytyczny błąd: {error_msg}")
         
     finally:
         # Upewnij się, że plik tymczasowy zostanie usunięty nawet w przypadku błędu
-        if 'temp_video_path' in locals() and os.path.exists(temp_video_path):
+        if 'temp_video_path' in locals() and temp_video_path and os.path.exists(temp_video_path):
             try:
                 os.remove(temp_video_path)
-            except:
-                pass
+                logger.info("Usunięto plik tymczasowy w bloku finally")
+            except Exception as e:
+                logger.warning(f"Nie udało się usunąć pliku tymczasowego w bloku finally: {e}")
