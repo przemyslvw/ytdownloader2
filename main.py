@@ -48,7 +48,7 @@ def fetch_video_length_with_loading(url_entry, start_entry, end_entry, output_en
     fetch_video_length(url_entry, start_entry, end_entry, output_entry)
     hide_loading_animation(loading_label)
 
-def download_and_extract_with_loading(url_entry, start_entry, end_entry, output_entry, format_var):
+def download_and_extract_with_loading(url_entry, start_entry, end_entry, output_entry, format_var, use_cookies_var):
     # Sanitacja nazwy pliku
     sanitized_filename = sanitize_filename(output_entry.get())
 
@@ -57,7 +57,7 @@ def download_and_extract_with_loading(url_entry, start_entry, end_entry, output_
     sanitized_output_entry.set(sanitized_filename)
 
     loading_label = show_loading_animation()
-    download_and_extract(url_entry, start_entry, end_entry, sanitized_output_entry, format_var)
+    download_and_extract(url_entry, start_entry, end_entry, sanitized_output_entry, format_var, use_cookies_var.get())
     hide_loading_animation(loading_label)
 
 
@@ -89,8 +89,16 @@ format_frame.pack()
 ttk.Radiobutton(format_frame, text="MP4", variable=format_var, value="mp4").grid(row=0, column=0, padx=10)
 ttk.Radiobutton(format_frame, text="MP3", variable=format_var, value="mp3").grid(row=0, column=1, padx=10)
 
-download_button = ttk.Button(root, text="Pobierz i wytnij fragment", command=lambda: download_and_extract_with_loading(url_entry, start_entry, end_entry, output_entry, format_var))
-download_button.pack(pady=20)
+# Dodanie opcji używania ciasteczek z przeglądarki
+use_cookies_var = tk.BooleanVar(value=False)
+cookies_check = ttk.Checkbutton(root, text="Użyj ciasteczek z przeglądarki (Firefox)", variable=use_cookies_var)
+cookies_check.pack(pady=5)
+
+download_button = ttk.Button(root, text="Pobierz i wytnij fragment", 
+                           command=lambda: download_and_extract_with_loading(
+                               url_entry, start_entry, end_entry, 
+                               output_entry, format_var, use_cookies_var))
+download_button.pack(pady=10)
 
 # Uruchomienie GUI
 root.mainloop()

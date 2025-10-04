@@ -66,10 +66,21 @@ def get_video_info(url):
         logger.error(f"Nieoczekiwany błąd: {str(e)}")
         raise Exception(f"Wystąpił błąd: {str(e)}")
 
-def download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var):
+def download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var, use_browser_cookies=False):
     """
     Pobiera i wycina fragment filmu z YouTube.
+    
+    Args:
+        url_entry: Pole z adresem URL filmu
+        start_entry: Pole z czasem początkowym w sekundach
+        end_entry: Pole z czasem końcowym w sekundach
+        output_entry: Pole z nazwą pliku wyjściowego
+        format_var: Zmienna z wybranym formatem wyjściowym
+        use_browser_cookies: Czy użyć ciasteczek z przeglądarki (domyślnie False)
     """
+    process = None
+    temp_dir = None
+    
     try:
         url = url_entry.get().strip()
         if not url:
@@ -116,17 +127,34 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
             logger.info("Pobieranie filmu z YouTube...")
             yt_dlp_command = [
                 "yt-dlp",
-                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "-f", "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
                 "--output", temp_video_path,
                 "--newline",
                 "--no-part",
-                "--no-check-certificate",
                 "--geo-bypass",
-                "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "--referer", "https://www.youtube.com/",
+                "--cookies-from-browser", "firefox" if use_browser_cookies else "none",
                 "--merge-output-format", "mp4",
                 "--force-overwrites",
                 "--no-mtime",
+                "--no-check-certificate",
+                "--extractor-args", "youtube:player_client=android",
+                "--extractor-args", "youtube:player_skip=webpage",
+                "--extractor-args", "youtube:player_backend=web",
+                "--extractor-args", "youtube:include_hls=1",
+                "--extractor-args", "youtube:include_dash_mp4=1",
+                "--throttled-rate", "100K",
+                "--socket-timeout", "30",
+                "--source-address", "0.0.0.0",
+                "--force-ipv4",
+                "--retries", "10",
+                "--fragment-retries", "10",
+                "--buffer-size", "16K",
+                "--http-chunk-size", "1M",
+                "--no-check-formats",
+                "--no-warnings",
+                "--ignore-errors",
                 url
             ]
             
@@ -149,7 +177,17 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
             
             # Sprawdź kod wyjścia
             if process.returncode != 0:
-                raise subprocess.CalledProcessError(process.returncode, yt_dlp_command)
+                error_output = ""
+                if process.stderr:
+                    error_output = process.stderr
+                elif process.stdout:
+                    error_output = process.stdout
+                raise subprocess.CalledProcessError(
+                    process.returncode, 
+                    yt_dlp_command,
+                    output=error_output,
+                    stderr=error_output
+                )
             
             # Znajdź rzeczywistą nazwę pliku (yt-dlp może dodać rozszerzenie)
             actual_video_path = temp_video_path % {'ext': 'mp4'}
