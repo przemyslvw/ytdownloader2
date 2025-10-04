@@ -15,6 +15,12 @@ root.title("Pobieranie fragmentu YouTube")
 root.geometry("450x500")
 root.resizable(False, False)
 
+# Upewnij się, że okno jest na wierzchu i widoczne
+root.lift()
+root.attributes('-topmost', True)
+root.after_idle(root.attributes, '-topmost', False)
+root.focus_force()
+
 # Nowoczesny styl dla elementów interfejsu
 style = ttk.Style()
 style.configure("TButton", font=("Arial", 10, "bold"), padding=6)

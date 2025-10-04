@@ -17,18 +17,52 @@ def get_video_info(url):
     Pobiera metadane filmu za pomocą yt-dlp i zwraca jako dict.
     """
     try:
-        # Użyj 'yt-dlp' zamiast 'yt-dlp.exe'
+        yt_dlp_command = [
+            "yt-dlp",
+            "--no-warnings",
+            "--ignore-errors",
+            "--geo-bypass",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "--referer", "https://www.youtube.com/",
+            "--dump-json",
+            url
+        ]
+        
         result = subprocess.run(
-            ["yt-dlp", "-j", url],  # Poprawiona nazwa programu
+            yt_dlp_command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             text=True,
             check=True
         )
-        return json.loads(result.stdout)
+        
+        if not result.stdout.strip():
+            raise Exception("Pusta odpowiedź z serwera")
+            
+        try:
+            video_info = json.loads(result.stdout)
+            if not isinstance(video_info, dict) or 'title' not in video_info:
+                raise Exception("Nieprawidłowa struktura odpowiedzi z serwera")
+            return video_info
+            
+        except json.JSONDecodeError as e:
+            error_msg = "Nie można sparsować odpowiedzi JSON"
+            if result.stderr:
+                error_msg += f"\nBłąd: {result.stderr}"
+            if result.stdout:
+                error_msg += f"\nOdpowiedź: {result.stdout[:500]}"
+            raise Exception(error_msg)
+            
     except subprocess.CalledProcessError as e:
-        messagebox.showerror("Błąd", f"Błąd przy pobieraniu metadanych:\n{e.output}")
-        raise
+        error_msg = e.stderr if e.stderr else "Nieznany błąd podczas pobierania informacji o filmie"
+        if "HTTP Error 429" in error_msg:
+            error_msg = "Zbyt wiele żądań. Proszę spróbować ponownie później."
+        elif "This video is not available" in error_msg:
+            error_msg = "Film jest niedostępny lub został usunięty."
+        raise Exception(f"Błąd yt-dlp: {error_msg}")
+        
+    except Exception as e:
+        raise Exception(f"Wystąpił błąd: {str(e)}")
 
 
 def fetch_video_length(url_entry, start_entry, end_entry, output_entry):

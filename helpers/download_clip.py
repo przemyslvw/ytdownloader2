@@ -4,7 +4,6 @@ import subprocess
 import json
 import tempfile
 import logging
-from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from tkinter import messagebox
 
@@ -27,31 +26,50 @@ def get_video_info(url):
             "yt-dlp",
             "--no-warnings",
             "--ignore-errors",
-            "--no-check-certificate",
             "--geo-bypass",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "--referer", "https://www.youtube.com/",
             "--dump-json",
             url
         ]
         
+        logger.info(f"Wykonywanie komendy: {' '.join(yt_dlp_command)}")
         result = subprocess.run(yt_dlp_command, capture_output=True, text=True, check=True)
         
+        if not result.stdout.strip():
+            raise Exception("Pusta odpowiedź z serwera")
+            
         try:
-            return json.loads(result.stdout)
+            video_info = json.loads(result.stdout)
+            if not isinstance(video_info, dict) or 'title' not in video_info:
+                logger.error(f"Nieprawidłowa struktura odpowiedzi: {video_info}")
+                raise Exception("Nie można odczytać informacji o filmie. Sprawdź poprawność linku.")
+            return video_info
         except json.JSONDecodeError as e:
-            logger.error("Odpowiedź serwera (debug):")
-            logger.error(result.stdout[:500])  # Wyświetl pierwsze 500 znaków odpowiedzi
-            raise Exception(f"Nieprawidłowa odpowiedź z serwera YouTube: {str(e)}")
+            logger.error("Nie można sparsować odpowiedzi JSON")
+            if result.stderr:
+                logger.error(f"Błąd stderr: {result.stderr}")
+            if result.stdout:
+                logger.error(f"Odpowiedź stdout (początek): {result.stdout[:500]}")
+            raise Exception("Nieprawidłowa odpowiedź z serwera YouTube. Spróbuj ponownie później.")
             
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr if e.stderr else "Nieznany błąd podczas pobierania informacji o filmie"
-        logger.error(f"Błąd yt-dlp: {error_msg}")
-        raise Exception(f"Błąd podczas wykonywania yt-dlp: {error_msg}")
+        logger.error(f"Błąd yt-dlp (kod {e.returncode}): {error_msg}")
+        if "HTTP Error 429" in error_msg:
+            raise Exception("Zbyt wiele żądań. Proszę spróbować ponownie później.")
+        elif "This video is not available" in error_msg:
+            raise Exception("Film jest niedostępny lub został usunięty.")
+        else:
+            raise Exception(f"Błąd podczas łączenia z YouTube: {error_msg}")
+    except Exception as e:
+        logger.error(f"Nieoczekiwany błąd: {str(e)}")
+        raise Exception(f"Wystąpił błąd: {str(e)}")
 
 def download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var):
-    temp_dir = None
-    process = None
+    """
+    Pobiera i wycina fragment filmu z YouTube.
+    """
     try:
         url = url_entry.get().strip()
         if not url:
@@ -74,7 +92,7 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
             end_time = float(end_entry.get().replace(',', '.'))
             
             if start_time < 0 or end_time <= start_time:
-                raise ValueError("Nieprawidłowe wartości czasu")
+                raise ValueError("Czas końcowy musi być większy od początkowego i dodatni")
                 
         except ValueError as e:
             messagebox.showerror("Błąd", "Nieprawidłowy format czasu. Użyj liczb (np. 12.5)")
