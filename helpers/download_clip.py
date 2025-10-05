@@ -134,7 +134,7 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
                 "--geo-bypass",
                 "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "--referer", "https://www.youtube.com/",
-                "--cookies-from-browser", "firefox" if use_browser_cookies else "none",
+                *(["--cookies-from-browser", "firefox"] if use_browser_cookies else []),
                 "--merge-output-format", "mp4",
                 "--force-overwrites",
                 "--no-mtime",
@@ -207,20 +207,42 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
             logger.info(f"Przetwarzanie wideo: wycinanie fragmentu od {start_time}s do {end_time}s")
             
             if selected_format == "mp4":
-                cmd = [
-                    'ffmpeg',
-                    '-y',
-                    '-ss', str(start_time),
-                    '-i', actual_video_path,
-                    '-to', str(end_time - start_time),
-                    '-c:v', 'libx264',
-                    '-c:a', 'aac',
-                    '-strict', 'experimental',
-                    '-b:a', '192k',
-                    '-movflags', '+faststart',
-                    final_output_path
-                ]
-                subprocess.run(cmd, check=True, capture_output=True, text=True)
+                try:
+                    # Najpierw sprawdź czy plik wejściowy istnieje i ma odpowiedni rozmiar
+                    if not os.path.exists(actual_video_path):
+                        raise FileNotFoundError(f"Plik wideo nie istnieje: {actual_video_path}")
+                        
+                    file_size = os.path.getsize(actual_video_path)
+                    if file_size == 0:
+                        raise ValueError(f"Plik wideo jest pusty: {actual_video_path}")
+                    
+                    logger.info(f"Przetwarzanie pliku o rozmiarze: {file_size / (1024*1024):.2f} MB")
+                    
+                    # Użyj trybu copy dla szybszego przetwarzania
+                    cmd = [
+                        'ffmpeg',
+                        '-y',
+                        '-ss', str(start_time),
+                        '-i', actual_video_path,
+                        '-to', str(end_time - start_time),
+                        '-c:v', 'copy',  # Użyj copy dla szybszego przetwarzania
+                        '-c:a', 'aac',
+                        '-b:a', '192k',
+                        '-movflags', '+faststart',
+                        final_output_path
+                    ]
+                    
+                    logger.info(f"Uruchamianie ffmpeg: {' '.join(cmd)}")
+                    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                    logger.info(f"ffmpeg zakończony z kodem {result.returncode}")
+                    
+                    # Sprawdź czy plik wyjściowy został utworzony
+                    if not os.path.exists(final_output_path) or os.path.getsize(final_output_path) == 0:
+                        raise Exception("Nie udało się utworzyć pliku wyjściowego")
+                        
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Błąd ffmpeg (kod {e.returncode}): {e.stderr}")
+                    raise Exception(f"Błąd przetwarzania wideo: {e.stderr}")
                 
             elif selected_format == "mp3":
                 video = VideoFileClip(actual_video_path)
