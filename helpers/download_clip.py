@@ -27,7 +27,8 @@ def get_video_info(url):
             "--no-warnings",
             "--ignore-errors",
             "--geo-bypass",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "--no-check-certificate",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "--referer", "https://www.youtube.com/",
             "--dump-json",
             url
@@ -125,6 +126,7 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
         try:
             # Pobierz film z użyciem yt-dlp
             logger.info("Pobieranie filmu z YouTube...")
+            # Simplified arguments: remove explicit source binding and experimental extractor args
             yt_dlp_command = [
                 "yt-dlp",
                 "-f", "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
@@ -132,27 +134,17 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
                 "--newline",
                 "--no-part",
                 "--geo-bypass",
+                "--no-check-certificate",
                 "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "--referer", "https://www.youtube.com/",
-                *(["--cookies-from-browser", "firefox"] if use_browser_cookies else []),
+                *( ["--cookies-from-browser", "firefox"] if use_browser_cookies else [] ),
                 "--merge-output-format", "mp4",
                 "--force-overwrites",
                 "--no-mtime",
-                "--no-check-certificate",
-                "--extractor-args", "youtube:player_client=android",
-                "--extractor-args", "youtube:player_skip=webpage",
-                "--extractor-args", "youtube:player_backend=web",
-                "--extractor-args", "youtube:include_hls=1",
-                "--extractor-args", "youtube:include_dash_mp4=1",
-                "--throttled-rate", "100K",
-                "--socket-timeout", "30",
-                "--source-address", "0.0.0.0",
-                "--force-ipv4",
                 "--retries", "10",
                 "--fragment-retries", "10",
                 "--buffer-size", "16K",
                 "--http-chunk-size", "1M",
-                "--no-check-formats",
                 "--no-warnings",
                 "--ignore-errors",
                 url
@@ -168,26 +160,92 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
                 text=True
             )
             
-            # Wyświetl postęp w konsoli
+            # Wyświetl postęp w konsoli i zbieraj wyjście do analizy
+            output_lines = []
             for line in process.stdout:
-                logger.info(line.strip())
+                sline = line.strip()
+                output_lines.append(sline)
+                logger.info(sline)
                 
             # Poczekaj na zakończenie procesu
             process.wait()
             
             # Sprawdź kod wyjścia
             if process.returncode != 0:
-                error_output = ""
-                if process.stderr:
-                    error_output = process.stderr
-                elif process.stdout:
-                    error_output = process.stdout
-                raise subprocess.CalledProcessError(
-                    process.returncode, 
-                    yt_dlp_command,
-                    output=error_output,
-                    stderr=error_output
-                )
+                # Combine collected output for diagnosis
+                error_output = "\n".join(output_lines)
+
+                # If we see a 403, attempt a fallback using a progressive (non-fragmented) format
+                if "HTTP Error 403" in error_output or "403 Forbidden" in error_output or "unable to download video data: HTTP Error 403" in error_output:
+                    logger.info("403 detected — próbuję fallbacku z progressive formatem (best[ext=mp4]/best)")
+                    fallback_cmd = [
+                        "yt-dlp",
+                        "-f", "best[ext=mp4]/best",
+                        "--output", temp_video_path,
+                        "--no-part",
+                        "--no-check-certificate",
+                        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "--referer", "https://www.youtube.com/",
+                        *( ["--cookies-from-browser", "firefox"] if use_browser_cookies else [] ),
+                        "--merge-output-format", "mp4",
+                        "--retries", "5",
+                        "--fragment-retries", "5",
+                        "--buffer-size", "16K",
+                        "--http-chunk-size", "1M",
+                        "--no-warnings",
+                        "--ignore-errors",
+                        url
+                    ]
+
+                    logger.info(f"Fallback command: {' '.join(fallback_cmd)}")
+                    fb_proc = subprocess.Popen(
+                        fallback_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        universal_newlines=True,
+                        bufsize=1,
+                        text=True
+                    )
+                    for line in fb_proc.stdout:
+                        logger.info(line.strip())
+                    fb_proc.wait()
+                    if fb_proc.returncode == 0:
+                        logger.info("Fallback pobieranie zakończone pomyślnie")
+                    else:
+                        # Jeśli fallback nie zadziałał i użytkownik nie prosił o ciasteczka,
+                        # spróbuj raz jeszcze używając ciasteczek z przeglądarki Firefox.
+                        if not use_browser_cookies:
+                            logger.info("Fallback nie powiódł się — próbuję ponownie z ciasteczkami z przeglądarki Firefox")
+                            cookies_cmd = list(fallback_cmd)
+                            # wstaw ciasteczka z przeglądarki
+                            # znajdź pozycję url na końcu: dodamy parametry przed url
+                            cookies_cmd = cookies_cmd[:-1] + ["--cookies-from-browser", "firefox", cookies_cmd[-1]]
+
+                            logger.info(f"Cookies fallback command: {' '.join(cookies_cmd)}")
+                            c_proc = subprocess.Popen(
+                                cookies_cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                universal_newlines=True,
+                                bufsize=1,
+                                text=True
+                            )
+                            for line in c_proc.stdout:
+                                logger.info(line.strip())
+                            c_proc.wait()
+                            if c_proc.returncode == 0:
+                                logger.info("Pobieranie z ciasteczkami zakończone pomyślnie")
+                            else:
+                                raise subprocess.CalledProcessError(c_proc.returncode, cookies_cmd, output=error_output, stderr=error_output)
+                        else:
+                            raise subprocess.CalledProcessError(fb_proc.returncode, fallback_cmd, output=error_output, stderr=error_output)
+                else:
+                    raise subprocess.CalledProcessError(
+                        process.returncode, 
+                        yt_dlp_command,
+                        output=error_output,
+                        stderr=error_output
+                    )
             
             # Znajdź rzeczywistą nazwę pliku (yt-dlp może dodać rozszerzenie)
             actual_video_path = temp_video_path % {'ext': 'mp4'}

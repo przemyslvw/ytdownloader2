@@ -1,0 +1,63 @@
+[debug] Command-line config: ['-v', '-f', 'bestvideo[height<=720]+bestaudio/best', '--no-check-certificate', '--user-agent', '....', '--referer', 'https://www.youtube.com/', '--cookies-from-browser', 'firefox', 'https://www.youtube.com/watch?v=ksWAT3uqlWA']
+[debug] Encodings: locale UTF-8, fs utf-8, pref UTF-8, out utf-8 (No ANSI), error utf-8 (No ANSI), screen utf-8 (No ANSI)
+[debug] yt-dlp version stable@2025.10.22 from yt-dlp/yt-dlp [c9356f308] (pip)
+[debug] Python 3.13.9 (CPython x86_64 64bit) - Linux-6.17.6-200.fc42.x86_64-x86_64-with-glibc2.41 (OpenSSL 3.2.6 30 Sep 2025, glibc 2.41)
+[debug] exe versions: ffmpeg 7.1.2 (fdk,setts), ffprobe 7.1.2
+[debug] Optional libraries: Cryptodome-3.23.0, brotli-1.1.0, certifi-2025.07.09, mutagen-1.47.0, requests-2.32.4, secretstorage-3.3.3, sqlite3-3.47.2, urllib3-2.3.0, websockets-14.1
+[debug] Proxy map: {}
+Extracting cookies from firefox
+[debug] Extracting cookies from: "/home/Przemas/.mozilla/firefox/x5eutg3z.default-release/cookies.sqlite"
+Extracted 2215 cookies from firefox
+[debug] Request Handlers: urllib, requests, websockets
+[debug] Plugin directories: none
+[debug] Loaded 1839 extractors
+[debug] [youtube] Found YouTube account cookies
+[debug] [youtube] [pot] PO Token Providers: none
+[debug] [youtube] [pot] PO Token Cache Providers: memory
+[debug] [youtube] [pot] PO Token Cache Spec Providers: webpo
+[youtube] Extracting URL: https://www.youtube.com/watch?v=ksWAT3uqlWA
+[youtube] ksWAT3uqlWA: Downloading webpage
+[youtube] ksWAT3uqlWA: Downloading tv client config
+[youtube] ksWAT3uqlWA: Downloading player 7dc3db36-main
+[debug] Saving youtube-sts.7dc3db36-main to cache
+[youtube] ksWAT3uqlWA: Downloading tv player API JSON
+[youtube] ksWAT3uqlWA: Downloading web safari player API JSON
+[debug] [youtube] Initial search was unable to find nsig function name
+        player = https://www.youtube.com/s/player/7dc3db36/player_ias.vflset/en_US/base.js
+WARNING: [youtube] Falling back to generic n function search
+         player = https://www.youtube.com/s/player/7dc3db36/player_ias.vflset/en_US/base.js
+WARNING: [youtube] ksWAT3uqlWA: nsig extraction failed: Some formats may be missing
+         n = wS8OdSeEj3eQ0u1pRh ; player = https://www.youtube.com/s/player/7dc3db36/player_ias.vflset/en_US/base.js
+         Please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+[debug] [youtube] Unable to extract nsig function code (caused by RegexNotFoundError('Unable to extract Initial JS player n function name; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+WARNING: [youtube] ksWAT3uqlWA: nsig extraction failed: Some formats may be missing
+         n = niP9i54qIhIrdFJwaW ; player = https://www.youtube.com/s/player/7dc3db36/player_ias.vflset/en_US/base.js
+         Please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+WARNING: [youtube] ksWAT3uqlWA: nsig extraction failed: Some formats may be missing
+         n = A70lUEZLMTRokBjmJD ; player = https://www.youtube.com/s/player/7dc3db36/player_ias.vflset/en_US/base.js
+         Please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+WARNING: [youtube] ksWAT3uqlWA: Some web_safari client https formats have been skipped as they are missing a url. YouTube is forcing SABR streaming for this client. See  https://github.com/yt-dlp/yt-dlp/issues/12482  for more details
+WARNING: [youtube] ksWAT3uqlWA: nsig extraction failed: Some formats may be missing
+         n = yzlSUW4MoEG8TvG5Zh ; player = https://www.youtube.com/s/player/7dc3db36/player_ias.vflset/en_US/base.js
+         Please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+WARNING: [youtube] ksWAT3uqlWA: Some web client https formats have been skipped as they are missing a url. YouTube is forcing SABR streaming for this client. See  https://github.com/yt-dlp/yt-dlp/issues/12482  for more details
+[youtube] ksWAT3uqlWA: Downloading m3u8 information
+WARNING: [youtube] Failed to download m3u8 information: <urllib3.connection.HTTPSConnection object at 0x7f99f297bd90>: Failed to establish a new connection: [Errno 111] Connection refused
+WARNING: Only images are available for download. use --list-formats to see them
+[debug] Sort order given by extractor: quality, res, fps, hdr:12, source, vcodec, channels, acodec, lang, proto
+[debug] Formats sorted by: hasvid, ie_pref, quality, res, fps, hdr:12(7), source, vcodec, channels, acodec, lang, proto, size, br, asr, vext, aext, hasaud, id
+ERROR: [youtube] ksWAT3uqlWA: Requested format is not available. Use --list-formats for a list of available formats
+Traceback (most recent call last):
+  File "/home/Przemas/.local/lib/python3.13/site-packages/yt_dlp/YoutubeDL.py", line 1645, in wrapper
+    return func(self, *args, **kwargs)
+  File "/home/Przemas/.local/lib/python3.13/site-packages/yt_dlp/YoutubeDL.py", line 1801, in __extract_info
+    return self.process_ie_result(ie_result, download, extra_info)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/Przemas/.local/lib/python3.13/site-packages/yt_dlp/YoutubeDL.py", line 1860, in process_ie_result
+    ie_result = self.process_video_result(ie_result, download=download)
+  File "/home/Przemas/.local/lib/python3.13/site-packages/yt_dlp/YoutubeDL.py", line 3000, in process_video_result
+    raise ExtractorError(
+        'Requested format is not available. Use --list-formats for a list of available formats',
+        expected=True, video_id=info_dict['id'], ie=info_dict['extractor'])
+yt_dlp.utils.ExtractorError: [youtube] ksWAT3uqlWA: Requested format is not available. Use --list-formats for a list of available formats
+
