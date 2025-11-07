@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from ttkthemes import ThemedTk
 from helpers.video_info import fetch_video_length
+import threading
 from helpers.download_clip import download_and_extract
 import re
 
@@ -45,8 +46,20 @@ def fetch_video_length_with_loading(url_entry, start_entry, end_entry, output_en
 
     # Animacja ładowania
     loading_label = show_loading_animation()
-    fetch_video_length(url_entry, start_entry, end_entry, output_entry)
-    hide_loading_animation(loading_label)
+
+    # Uruchom fetch w tle, aby nie blokować pętli Tkinter
+    def worker():
+        try:
+            fetch_video_length(url_entry, start_entry, end_entry, output_entry)
+        finally:
+            # Ukryj animację w wątku GUI
+            try:
+                root.after(0, hide_loading_animation, loading_label)
+            except Exception:
+                pass
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
 
 def download_and_extract_with_loading(url_entry, start_entry, end_entry, output_entry, format_var, use_cookies_var):
     # Sanitacja nazwy pliku
@@ -57,8 +70,18 @@ def download_and_extract_with_loading(url_entry, start_entry, end_entry, output_
     sanitized_output_entry.set(sanitized_filename)
 
     loading_label = show_loading_animation()
-    download_and_extract(url_entry, start_entry, end_entry, sanitized_output_entry, format_var, use_cookies_var.get())
-    hide_loading_animation(loading_label)
+
+    def worker():
+        try:
+            download_and_extract(url_entry, start_entry, end_entry, sanitized_output_entry, format_var, use_cookies_var.get())
+        finally:
+            try:
+                root.after(0, hide_loading_animation, loading_label)
+            except Exception:
+                pass
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
 
 
 # Elementy interfejsu

@@ -67,6 +67,95 @@ def get_video_info(url):
         logger.error(f"Nieoczekiwany błąd: {str(e)}")
         raise Exception(f"Wystąpił błąd: {str(e)}")
 
+def download_video(url, output_path, use_cookies=False):
+    """
+    Pobiera film z YouTube z obsługą błędów i automatycznymi fallbackami.
+    
+    Args:
+        url: URL filmu do pobrania
+        output_path: Ścieżka do zapisu pliku (z placeholderem %(ext)s)
+        use_cookies: Czy użyć ciasteczek z przeglądarki
+    
+    Returns:
+        tuple: (success: bool, output_path: str, error: str)
+    """
+    # Formaty do próbowania w kolejności
+    format_attempts = [
+        # Najlepsza jakość do 1080p, MP4 + M4A
+        "bestvideo[ext=mp4][height<=1080][fps<=60]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]/best[height<=1080]",
+        # Dowolna jakość MP4
+        "best[ext=mp4]",
+        # Ostateczne rozwiązanie - cokolwiek dostępne
+        "best"
+    ]
+    
+    for attempt, format_str in enumerate(format_attempts, 1):
+        try:
+            logger.info(f"Próba {attempt}: Pobieranie w formacie: {format_str}")
+            
+            cmd = [
+                "yt-dlp",
+                "-f", format_str,
+                "--output", output_path,
+                "--newline",
+                "--no-part",
+                "--geo-bypass",
+                "--no-check-certificate",
+                "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "--referer", "https://www.youtube.com/",
+                "--merge-output-format", "mp4",
+                "--force-overwrites",
+                "--no-mtime",
+                "--retries", "5",
+                "--fragment-retries", "5",
+                "--buffer-size", "16K",
+                "--http-chunk-size", "1M",
+                "--no-warnings",
+                "--ignore-errors"
+            ]
+            
+            if use_cookies:
+                cmd.extend(["--cookies-from-browser", "firefox"])
+                
+            cmd.append(url)
+            
+            logger.info(f"Wykonywanie komendy: {' '.join(cmd)}")
+            
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1,
+                text=True
+            )
+            
+            # Wyświetl postęp w czasie rzeczywistym
+            output = []
+            for line in process.stdout:
+                line = line.strip()
+                output.append(line)
+                logger.info(f"[yt-dlp] {line}")
+                
+            process.wait()
+            
+            if process.returncode == 0:
+                # Znajdź faktyczną ścieżkę do pobranego pliku
+                final_path = output_path.replace('%(ext)s', 'mp4')
+                if os.path.exists(final_path):
+                    return True, final_path, None
+                    
+            # Jeśli doszliśmy tutaj, coś poszło nie tak
+            error_msg = f"Błąd podczas próby {attempt}: "
+            error_msg += "\n".join(line for line in output if 'error' in line.lower() or 'failed' in line.lower())
+            logger.error(error_msg)
+            
+        except Exception as e:
+            error_msg = f"Błąd podczas próby {attempt}: {str(e)}"
+            logger.exception(error_msg)
+    
+    return False, None, "Wszystkie próby pobrania filmu zakończyły się niepowodzeniem"
+
 def download_and_extract(url_entry, start_entry, end_entry, output_entry, format_var, use_browser_cookies=False):
     """
     Pobiera i wycina fragment filmu z YouTube.
@@ -121,211 +210,93 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
         
         # Utwórz katalog tymczasowy
         temp_dir = tempfile.mkdtemp()
-        temp_video_path = os.path.join(temp_dir, "temp_video.%(ext)s")
+        temp_video_path = os.path.join(temp_dir, "video.%(ext)s")
 
         try:
             # Pobierz film z użyciem yt-dlp
             logger.info("Pobieranie filmu z YouTube...")
-            # Simplified arguments: remove explicit source binding and experimental extractor args
-            yt_dlp_command = [
-                "yt-dlp",
-                "-f", "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                "--output", temp_video_path,
-                "--newline",
-                "--no-part",
-                "--geo-bypass",
-                "--no-check-certificate",
-                "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "--referer", "https://www.youtube.com/",
-                *( ["--cookies-from-browser", "firefox"] if use_browser_cookies else [] ),
-                "--merge-output-format", "mp4",
-                "--force-overwrites",
-                "--no-mtime",
-                "--retries", "10",
-                "--fragment-retries", "10",
-                "--buffer-size", "16K",
-                "--http-chunk-size", "1M",
-                "--no-warnings",
-                "--ignore-errors",
-                url
-            ]
             
-            # Uruchom proces z wyjściem w czasie rzeczywistym
-            process = subprocess.Popen(
-                yt_dlp_command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True,
-                bufsize=1,
-                text=True
+            # Użyj nowej funkcji do pobierania
+            success, downloaded_file, error_msg = download_video(
+                url, 
+                temp_video_path,
+                use_cookies=use_browser_cookies
             )
             
-            # Wyświetl postęp w konsoli i zbieraj wyjście do analizy
-            output_lines = []
-            for line in process.stdout:
-                sline = line.strip()
-                output_lines.append(sline)
-                logger.info(sline)
+            if not success or not downloaded_file:
+                logger.error(f"Nie udało się pobrać filmu: {error_msg}")
+                messagebox.showerror("Błąd", f"Nie udało się pobrać filmu: {error_msg}")
+                return
                 
-            # Poczekaj na zakończenie procesu
-            process.wait()
+            logger.info(f"Pomyślnie pobrano plik: {downloaded_file}")
             
-            # Sprawdź kod wyjścia
-            if process.returncode != 0:
-                # Combine collected output for diagnosis
-                error_output = "\n".join(output_lines)
-
-                # If we see a 403, attempt a fallback using a progressive (non-fragmented) format
-                if "HTTP Error 403" in error_output or "403 Forbidden" in error_output or "unable to download video data: HTTP Error 403" in error_output:
-                    logger.info("403 detected — próbuję fallbacku z progressive formatem (best[ext=mp4]/best)")
-                    fallback_cmd = [
-                        "yt-dlp",
-                        "-f", "best[ext=mp4]/best",
-                        "--output", temp_video_path,
-                        "--no-part",
-                        "--no-check-certificate",
-                        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        "--referer", "https://www.youtube.com/",
-                        *( ["--cookies-from-browser", "firefox"] if use_browser_cookies else [] ),
-                        "--merge-output-format", "mp4",
-                        "--retries", "5",
-                        "--fragment-retries", "5",
-                        "--buffer-size", "16K",
-                        "--http-chunk-size", "1M",
-                        "--no-warnings",
-                        "--ignore-errors",
-                        url
-                    ]
-
-                    logger.info(f"Fallback command: {' '.join(fallback_cmd)}")
-                    fb_proc = subprocess.Popen(
-                        fallback_cmd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        universal_newlines=True,
-                        bufsize=1,
-                        text=True
-                    )
-                    for line in fb_proc.stdout:
-                        logger.info(line.strip())
-                    fb_proc.wait()
-                    if fb_proc.returncode == 0:
-                        logger.info("Fallback pobieranie zakończone pomyślnie")
-                    else:
-                        # Jeśli fallback nie zadziałał i użytkownik nie prosił o ciasteczka,
-                        # spróbuj raz jeszcze używając ciasteczek z przeglądarki Firefox.
-                        if not use_browser_cookies:
-                            logger.info("Fallback nie powiódł się — próbuję ponownie z ciasteczkami z przeglądarki Firefox")
-                            cookies_cmd = list(fallback_cmd)
-                            # wstaw ciasteczka z przeglądarki
-                            # znajdź pozycję url na końcu: dodamy parametry przed url
-                            cookies_cmd = cookies_cmd[:-1] + ["--cookies-from-browser", "firefox", cookies_cmd[-1]]
-
-                            logger.info(f"Cookies fallback command: {' '.join(cookies_cmd)}")
-                            c_proc = subprocess.Popen(
-                                cookies_cmd,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                universal_newlines=True,
-                                bufsize=1,
-                                text=True
-                            )
-                            for line in c_proc.stdout:
-                                logger.info(line.strip())
-                            c_proc.wait()
-                            if c_proc.returncode == 0:
-                                logger.info("Pobieranie z ciasteczkami zakończone pomyślnie")
-                            else:
-                                raise subprocess.CalledProcessError(c_proc.returncode, cookies_cmd, output=error_output, stderr=error_output)
-                        else:
-                            raise subprocess.CalledProcessError(fb_proc.returncode, fallback_cmd, output=error_output, stderr=error_output)
-                else:
-                    raise subprocess.CalledProcessError(
-                        process.returncode, 
-                        yt_dlp_command,
-                        output=error_output,
-                        stderr=error_output
-                    )
-            
-            # Znajdź rzeczywistą nazwę pliku (yt-dlp może dodać rozszerzenie)
-            actual_video_path = temp_video_path % {'ext': 'mp4'}
-            if not os.path.exists(actual_video_path):
-                # Spróbuj znaleźć plik z innym rozszerzeniem
-                for f in os.listdir(temp_dir):
-                    if f.startswith("temp_video."):
-                        actual_video_path = os.path.join(temp_dir, f)
-                        break
-            
-            if not os.path.exists(actual_video_path) or os.path.getsize(actual_video_path) == 0:
-                raise Exception("Pobrany plik wideo jest pusty lub nie istnieje")
+            # Sprawdź rozmiar pliku
+            file_size = os.path.getsize(downloaded_file) / (1024 * 1024)  # w MB
+            if file_size < 0.1:  # Jeśli plik jest mniejszy niż 100KB, prawdopodobnie coś poszło nie tak
+                raise Exception("Pobrany plik jest zbyt mały, prawdopodobnie wystąpił błąd podczas pobierania")
                 
-            logger.info("Pobieranie zakończone pomyślnie")
-
-            # Wytnij fragment
-            logger.info(f"Przetwarzanie wideo: wycinanie fragmentu od {start_time}s do {end_time}s")
+            logger.info(f"Rozmiar pobranego pliku: {file_size:.2f} MB")
             
-            if selected_format == "mp4":
-                try:
-                    # Najpierw sprawdź czy plik wejściowy istnieje i ma odpowiedni rozmiar
-                    if not os.path.exists(actual_video_path):
-                        raise FileNotFoundError(f"Plik wideo nie istnieje: {actual_video_path}")
-                        
-                    file_size = os.path.getsize(actual_video_path)
-                    if file_size == 0:
-                        raise ValueError(f"Plik wideo jest pusty: {actual_video_path}")
-                    
-                    logger.info(f"Przetwarzanie pliku o rozmiarze: {file_size / (1024*1024):.2f} MB")
-                    
-                    # Użyj trybu copy dla szybszego przetwarzania
-                    cmd = [
-                        'ffmpeg',
-                        '-y',
-                        '-ss', str(start_time),
-                        '-i', actual_video_path,
-                        '-to', str(end_time - start_time),
-                        '-c:v', 'copy',  # Użyj copy dla szybszego przetwarzania
-                        '-c:a', 'aac',
-                        '-b:a', '192k',
-                        '-movflags', '+faststart',
-                        final_output_path
-                    ]
-                    
-                    logger.info(f"Uruchamianie ffmpeg: {' '.join(cmd)}")
-                    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-                    logger.info(f"ffmpeg zakończony z kodem {result.returncode}")
-                    
-                    # Sprawdź czy plik wyjściowy został utworzony
-                    if not os.path.exists(final_output_path) or os.path.getsize(final_output_path) == 0:
-                        raise Exception("Nie udało się utworzyć pliku wyjściowego")
-                        
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"Błąd ffmpeg (kod {e.returncode}): {e.stderr}")
-                    raise Exception(f"Błąd przetwarzania wideo: {e.stderr}")
+            # Przygotuj docelową ścieżkę
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
                 
-            elif selected_format == "mp3":
-                video = VideoFileClip(actual_video_path)
-                audio = video.subclip(start_time, end_time).audio
-                audio.write_audiofile(
-                    final_output_path,
-                    codec='libmp3lame',
-                    bitrate='192k',
-                    logger=None
+            # Sprawdź i przetwórz czasy
+            try:
+                start_time = float(start_entry.get().replace(',', '.'))
+                end_time = float(end_entry.get().replace(',', '.'))
+                
+                if start_time < 0 or end_time <= start_time:
+                    raise ValueError("Czas końcowy musi być większy od początkowego i dodatni")
+                    
+                # Przygotuj komendę do przycięcia filmu
+                cmd = [
+                    "ffmpeg",
+                    "-y",  # Nadpisz plik wyjściowy, jeśli istnieje
+                    "-i", downloaded_file,
+                    "-ss", str(start_time),
+                    "-to", str(end_time),
+                    "-c:v", "libx264",
+                    "-c:a", "aac",
+                    "-strict", "experimental",
+                    "-b:a", "192k",
+                    "-movflags", "+faststart",
+                    final_output_path
+                ]
+                
+                logger.info(f"Przycinanie filmu: {' '.join(cmd)}")
+                
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True,
+                    bufsize=1,
+                    text=True
                 )
-                video.close()
-                audio.close()
-
-            logger.info(f"Plik został zapisany jako: {final_output_path}")
-            messagebox.showinfo("Sukces", f"Wycinek został zapisany jako:\n{final_output_path}")
-            
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Błąd podczas pobierania filmu (kod {e.returncode})"
-            logger.error(error_msg)
-            messagebox.showerror("Błąd", error_msg)
-            
+                
+                # Wyświetl postęp w czasie rzeczywistym
+                for line in process.stdout:
+                    line = line.strip()
+                    if 'time=' in line and 'bitrate=' in line:
+                        logger.info(f"[ffmpeg] {line}")
+                        
+                process.wait()
+                
+                if process.returncode != 0:
+                    raise Exception(f"Błąd podczas przycinania filmu (kod {process.returncode})")
+                    
+                logger.info(f"Pomyślnie zapisano plik: {final_output_path}")
+                messagebox.showinfo("Sukces", f"Pomyślnie zapisano plik:\n{final_output_path}")
+                
+            except ValueError as e:
+                messagebox.showerror("Błąd", f"Nieprawidłowy format czasu: {str(e)}")
+                return
+                
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Nieoczekiwany błąd: {error_msg}")
-            messagebox.showerror("Błąd", f"Wystąpił nieoczekiwany błąd: {error_msg}")
+            logger.exception("Błąd podczas przetwarzania filmu")
+            messagebox.showerror("Błąd", f"Wystąpił błąd podczas przetwarzania filmu: {str(e)}")
+            return
             
     except Exception as e:
         error_msg = str(e)
@@ -333,25 +304,53 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
         messagebox.showerror("Błąd krytyczny", f"Wystąpił krytyczny błąd: {error_msg}")
         
     finally:
-        # Zatrzymaj proces, jeśli jeszcze działa
-        if process and process.poll() is None:
-            process.terminate()
+        # Sprzątanie po sobie
+        if process and hasattr(process, 'poll') and process.poll() is None:
             try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-        
-        # Sprzątanie plików tymczasowych
-        if temp_dir and os.path.exists(temp_dir):
-            try:
-                for file in os.listdir(temp_dir):
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except (subprocess.TimeoutExpired, AttributeError):
                     try:
-                        file_path = os.path.join(temp_dir, file)
-                        if os.path.isfile(file_path):
-                            os.unlink(file_path)
-                    except Exception as e:
-                        logger.warning(f"Nie udało się usunąć pliku {file}: {e}")
-                os.rmdir(temp_dir)
-                logger.info("Usunięto pliki tymczasowe")
+                        process.kill()
+                    except:
+                        pass
             except Exception as e:
-                logger.warning(f"Nie udało się usunąć plików tymczasowych: {e}")
+                logger.error(f"Błąd podczas zatrzymywania procesu: {str(e)}")
+        
+        if temp_dir and os.path.exists(temp_dir):
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    # Usuń wszystkie pliki w katalogu tymczasowym
+                    for filename in os.listdir(temp_dir):
+                        file_path = os.path.join(temp_dir, filename)
+                        try:
+                            if os.path.isfile(file_path) or os.path.islink(file_path):
+                                os.unlink(file_path)
+                            elif os.path.isdir(file_path):
+                                shutil.rmtree(file_path, ignore_errors=True)
+                        except Exception as e:
+                            logger.warning(f"Nie udało się usunąć {file_path}: {str(e)}")
+                    
+                    # Spróbuj usunąć katalog
+                    os.rmdir(temp_dir)
+                    logger.info("Pomyślnie usunięto pliki tymczasowe")
+                    break
+                    
+                except OSError as e:
+                    if attempt == max_attempts - 1:  # Ostatnia próba
+                        logger.error(f"Nie udało się usunąć katalogu tymczasowego {temp_dir}: {str(e)}")
+                        # Próba zmiany uprawnień i ponowne usunięcie
+                        try:
+                            os.chmod(temp_dir, 0o777)
+                            for root, dirs, files in os.walk(temp_dir, topdown=False):
+                                for name in files:
+                                    os.chmod(os.path.join(root, name), 0o777)
+                                for name in dirs:
+                                    os.chmod(os.path.join(root, name), 0o777)
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                            logger.info("Pomyślnie usunięto katalog tymczasowy po zmianie uprawnień")
+                        except Exception as e2:
+                            logger.error(f"Błąd podczas usuwania katalogu po zmianie uprawnień: {str(e2)}")
+                    time.sleep(1)  # Poczekaj chwilę przed ponowną próbą
