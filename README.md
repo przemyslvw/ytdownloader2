@@ -1,30 +1,49 @@
 # YT downloader 2
 
+# YT Downloader 2
+
 ## Wymagania wstępne
 
-1. Python 3.6 lub nowszy
-2. FFmpeg
+- Python 3.8 lub nowszy
+- FFmpeg
+- Git (opcjonalnie, do klonowania repozytorium)
 
 ## Instalacja
 
+### Metoda 1: Instalacja z repozytorium (zalecana)
+
 1. Sklonuj repozytorium:
    ```bash
-   git clone [adres-repozytorium]
+   git clone https://github.com/przemyslvw/ytdownloader2.git
    cd ytdownloader2
    ```
 
 2. Stwórz i aktywuj wirtualne środowisko Pythona:
    ```bash
-   python3 -m venv venv
+   python -m venv venv
    source venv/bin/activate  # Linux/macOS
    # lub
    # venv\Scripts\activate  # Windows
    ```
 
-3. Zainstaluj wymagane pakiety:
+3. Zainstaluj pakiet w trybie edytowalnym z zależnościami:
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
+
+### Metoda 2: Instalacja bezpośrednia
+
+```bash
+pip install git+https://github.com/przemyslvw/ytdownloader2.git
+```
+
+### Instalacja zależności developerskich (opcjonalnie)
+
+Jeśli chcesz współtworzyć projekt, zainstaluj dodatkowe zależności:
+
+```bash
+pip install -e ".[dev]"
+```
 
 ## Instalacja FFmpeg
 
