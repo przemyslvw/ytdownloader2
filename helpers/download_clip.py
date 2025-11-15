@@ -200,13 +200,14 @@ def download_and_extract(url_entry, start_entry, end_entry, output_entry, format
             return
 
         # Przygotuj ścieżki plików
-        output_dir = os.path.dirname(os.path.abspath(output_entry.get())) if output_entry.get() else "./output"
+        output_dir = "output"
         os.makedirs(output_dir, exist_ok=True)
         
-        output_filename = output_entry.get() or f"{video_title}_fragment"
+        # Pobierz tylko nazwę pliku z podanej ścieżki (jeśli jest) lub użyj domyślnej
+        output_filename = os.path.basename(output_entry.get()) if output_entry.get() else f"{video_title}_fragment"
         output_filename = os.path.splitext(output_filename)[0]  # Usuń rozszerzenie jeśli istnieje
         selected_format = format_var.get()
-        final_output_path = os.path.join(output_dir, f"{output_filename}.{selected_format}")
+        final_output_path = os.path.join(output_dir, f"{sanitize_filename(output_filename)}.{selected_format}")
         
         # Utwórz katalog tymczasowy
         temp_dir = tempfile.mkdtemp()
